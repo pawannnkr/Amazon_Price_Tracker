@@ -1,0 +1,12 @@
+{
+  "notifications": {
+    "email": "yourmail@atomicmail.io",
+    "phone_number": "+919876543210"
+  },
+  "products": [
+    {
+      "url": "https://www.amazon.in/Tapo-Security-Weatherproof-Detection-C510W/dp/B0BZMLKXL4/ref=pd_ci_mcx_mh_mcx_views_0_title?pd_rd_w=TT3l1&content-id=amzn1.sym.dbd914f5-523a-42dd-a58d-391b562b9604%3Aamzn1.symc.45dc5f4c-d617-4dba-aa26-2cadef3da899&pf_rd_p=dbd914f5-523a-42dd-a58d-391b562b9604&pf_rd_r=YV02401WJVYPK1YSFY7S&pd_rd_wg=udjKQ&pd_rd_r=5278f9f1-b832-435e-9b2d-c7f9dcea349d&pd_rd_i=B0BZMLKXL4",
+      "threshold": 12000
+    }
+  ]
+}
