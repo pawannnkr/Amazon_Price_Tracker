@@ -83,14 +83,6 @@ The application uses **PostgreSQL** database by default to store:
    python init_db.py
    ```
 
-### Using SQLite (Development/Testing)
-
-To use SQLite instead of PostgreSQL, set in `.env`:
-```env
-USE_SQLITE=true
-```
-
-This will create a local `price_tracker.db` file for development.
 
 ### Database Schema
 
@@ -100,14 +92,6 @@ This will create a local `price_tracker.db` file for development.
 
 The database file (`price_tracker.db`) will be created automatically on first run if not initialized manually.
 
-## Usage
-
-### GUI Application (Standalone)
-
-Run the GUI application:
-```bash
-python run_gui.py
-```
 
 ### Command-Line Tracker (Original Logic)
 
@@ -142,18 +126,6 @@ See `api/API_DOCUMENTATION.md` for complete API documentation.
 - `GET /api/history/<url>` - Get product price history
 - `GET /api/history/<url>/stats` - Get price statistics
 
-## Building Standalone Executables
-
-### Linux/Mac
-```bash
-chmod +x build.sh
-./build.sh
-```
-
-### Windows
-```bash
-build.bat
-```
 
 The executables will be created in the `dist` directory.
 
@@ -175,10 +147,6 @@ DATABASE_URL=postgresql://username:password@localhost:5432/price_tracker
 # DB_NAME=price_tracker
 # DB_USER=postgres
 # DB_PASSWORD=postgres
-
-# Use SQLite for development (optional)
-USE_SQLITE=false
-```
 
 ## Project Structure
 
