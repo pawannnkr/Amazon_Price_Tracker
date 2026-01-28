@@ -1,0 +1,173 @@
+---
+# ConfigMap for environment variables
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: amazon-tracker-config
+  namespace: default
+data:
+  FLASK_ENV: "production"
+  PYTHONUNBUFFERED: "1"
+
+---
+# Deployment for API Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: amazon-price-tracker-api
+  labels:
+    app: amazon-price-tracker
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: amazon-price-tracker
+      component: api
+  template:
+    metadata:
+      labels:
+        app: amazon-price-tracker
+        component: api
+    spec:
+      containers:
+      - name: api
+        image: gcr.io/YOUR_PROJECT_ID/amazon-price-tracker:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 5000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: amazon-tracker-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 5000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        volumeMounts:
+        - name: config
+          mountPath: /app/config.json
+          subPath: config.json
+      volumes:
+      - name: config
+        configMap:
+          name: app-config
+
+---
+# Service to expose the API
+apiVersion: v1
+kind: Service
+metadata:
+  name: amazon-price-tracker-api
+  labels:
+    app: amazon-price-tracker
+    component: api
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: amazon-price-tracker
+    component: api
+
+---
+# StatefulSet for Price Tracker Worker
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: amazon-price-tracker-worker
+  labels:
+    app: amazon-price-tracker
+    component: worker
+spec:
+  serviceName: "amazon-price-tracker-worker"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: amazon-price-tracker
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: amazon-price-tracker
+        component: worker
+    spec:
+      containers:
+      - name: worker
+        image: gcr.io/YOUR_PROJECT_ID/amazon-price-tracker:latest
+        imagePullPolicy: Always
+        command: ["python", "run_tracker.py"]
+        envFrom:
+        - configMapRef:
+            name: amazon-tracker-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: config
+          mountPath: /app/config.json
+          subPath: config.json
+        - name: data
+          mountPath: /app/database
+      volumes:
+      - name: config
+        configMap:
+          name: app-config
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+# HorizontalPodAutoscaler for API
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: amazon-tracker-api-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: amazon-price-tracker-api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

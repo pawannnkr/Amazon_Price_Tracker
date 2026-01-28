@@ -8,7 +8,6 @@ A standalone application and REST API for tracking Amazon product prices with da
 - 📧 Email notifications when prices drop
 - 📱 WhatsApp notifications when prices drop
 - 💾 **PostgreSQL Database** - All data stored in database (products, price history, settings)
-- 🔄 **SQLite Support** - Can use SQLite for development/testing
 - 📊 Price history tracking - stores all price changes over time
 - 📈 Price statistics - view lowest, highest, average prices and trends
 - 🖥️ Standalone GUI application
@@ -30,7 +29,7 @@ python init_db.py
 
 4. Configure your settings:
    - Edit `.env` file with your email credentials
-   - Configure notifications via API or GUI
+   - Configure notifications via API 
 
 ## Database
 
@@ -61,20 +60,20 @@ The application uses **PostgreSQL** database by default to store:
    # Create database and user
    CREATE DATABASE price_tracker;
    CREATE USER price_tracker_user WITH PASSWORD 'your_password';
-   GRANT ALL PRIVILEGES ON DATABASE price_tracker TO price_tracker_user;
+   GRANT ALL PRIVILEGES ON DATABASE Db_name TO db_name_user;
    \q
    ```
 
 3. **Configure Database Connection** in `.env`:
    ```env
    # Option 1: Full connection string (recommended)
-   DATABASE_URL=postgresql://price_tracker_user:your_password@localhost:5432/price_tracker
+   DATABASE_URL=postgresql://price_tracker_user:your_password@localhost:5432/db_name
    
    # Option 2: Individual components
    DB_HOST=localhost
    DB_PORT=5432
-   DB_NAME=price_tracker
-   DB_USER=price_tracker_user
+   DB_NAME=Db_name
+   DB_USER=Db_user
    DB_PASSWORD=your_password
    ```
 
@@ -89,9 +88,6 @@ The application uses **PostgreSQL** database by default to store:
 - **products**: Stores tracked products
 - **price_history**: Stores price history entries
 - **notification_settings**: Stores notification configuration
-
-The database file (`price_tracker.db`) will be created automatically on first run if not initialized manually.
-
 
 ### Command-Line Tracker (Original Logic)
 
@@ -140,17 +136,16 @@ SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 
 # PostgreSQL Database Configuration
-DATABASE_URL=postgresql://username:password@localhost:5432/price_tracker
+DATABASE_URL=postgresql://username:password@localhost:5432/Db_name
 # OR use individual components:
 # DB_HOST=localhost
 # DB_PORT=5432
 # DB_NAME=price_tracker
-# DB_USER=postgres
-# DB_PASSWORD=postgres
+# DB_USER=Db_user
+# DB_PASSWORD=Db-Password
 
 ## Project Structure
 
-```
 Amazon_Price_Tracker/
 ├── core/                 # Core functionality
 │   ├── __init__.py
@@ -174,7 +169,7 @@ Amazon_Price_Tracker/
 ├── config.json          # Legacy config (optional)
 ├── .env                 # Environment variables
 └── requirements.txt     # Python dependencies
-```
+
 
 ## Database Migration
 

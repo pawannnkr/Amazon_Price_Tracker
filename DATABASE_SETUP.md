@@ -56,7 +56,7 @@ Edit `.env` file:
 
 **Option 1: Full Connection String (Recommended)**
 ```env
-DATABASE_URL=postgresql://price_tracker_user:your_secure_password@localhost:5432/price_tracker
+DATABASE_URL=postgresql://price_tracker_user:your_secure_password@localhost:5432/DB_name
 ```
 
 **Option 2: Individual Components**
@@ -101,17 +101,6 @@ This will create a local `price_tracker.db` file.
 ### PostgreSQL
 ```
 postgresql://username:password@host:port/database
-postgresql://user:pass@localhost:5432/price_tracker
-```
-
-### PostgreSQL with SSL
-```
-postgresql://user:pass@host:5432/db?sslmode=require
-```
-
-### Remote PostgreSQL
-```
-postgresql://user:pass@remote-host.com:5432/price_tracker
 ```
 
 ## Troubleshooting

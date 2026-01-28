@@ -5,14 +5,8 @@ The error `password authentication failed for user "price_tracker_user"` means t
 
 ## Solution: Create Database and User
 
-### Option 1: Using SQL Script (Recommended)
 
-```bash
-# Run the SQL script
-sudo -u postgres psql -f database/create_db.sql
-```
-
-### Option 2: Manual Setup
+### Manual Setup
 
 ```bash
 # Connect to PostgreSQL
@@ -33,20 +27,6 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO price_tracke
 
 # Exit
 \q
-```
-
-### Option 3: One-liner Command
-
-```bash
-sudo -u postgres psql <<EOF
-CREATE DATABASE price_tracker;
-CREATE USER price_tracker_user WITH PASSWORD 'pass@123';
-GRANT ALL PRIVILEGES ON DATABASE price_tracker TO price_tracker_user;
-\c price_tracker
-GRANT ALL ON SCHEMA public TO price_tracker_user;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO price_tracker_user;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO price_tracker_user;
-EOF
 ```
 
 ## Verify Setup

@@ -1,0 +1,24 @@
+# Docker Registry Configuration
+
+# DOCKER HUB
+DOCKER_REGISTRY=docker.io
+DOCKER_USERNAME=your_docker_username
+DOCKER_IMAGE_NAME=amazon-price-tracker
+DOCKER_IMAGE_TAG=latest
+
+# GOOGLE CONTAINER REGISTRY (GCR)
+GCR_PROJECT_ID=your-gcp-project-id
+GCR_REGION=us-central1
+GCR_IMAGE_NAME=amazon-price-tracker
+GCR_IMAGE_TAG=latest
+
+# ARTIFACTORY (Optional)
+ARTIFACTORY_REGISTRY=artifactory.company.com
+ARTIFACTORY_REPO=docker-repo
+ARTIFACTORY_IMAGE_NAME=amazon-price-tracker
+ARTIFACTORY_IMAGE_TAG=latest
+
+# GITHUB CONTAINER REGISTRY (GHCR)
+GHCR_USERNAME=your_github_username
+GHCR_IMAGE_NAME=amazon-price-tracker
+GHCR_IMAGE_TAG=latest

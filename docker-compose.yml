@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  amazon-price-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: amazon-price-tracker
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./database:/app/database
+    restart: unless-stopped
+    networks:
+      - tracker-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # Optional: Add a price tracker worker service (commented out by default)
+  # price-tracker-worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: price-tracker-worker
+  #   command: python run_tracker.py
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #   volumes:
+  #     - ./database:/app/database
+  #   restart: unless-stopped
+  #   networks:
+  #     - tracker-network
+  #   depends_on:
+  #     amazon-price-tracker:
+  #       condition: service_healthy
+
+networks:
+  tracker-network:
+    driver: bridge
