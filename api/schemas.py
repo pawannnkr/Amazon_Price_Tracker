@@ -1,16 +1,8 @@
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, validate, ValidationError, validates_schema
 
 
 class AddProductSchema(Schema):
     """Schema for adding a new product"""
-    user_id = fields.Int(
-        required=True,
-        strict=True,
-        metadata={
-            "description": "User ID who owns the product",
-            "example": 1
-        }
-    )
     url = fields.Str(
         required=True,
         validate=validate.URL(),
@@ -31,34 +23,18 @@ class AddProductSchema(Schema):
 
 class RemoveProductSchema(Schema):
     """Schema for removing a product"""
-    user_id = fields.Int(
+    url = fields.Str(
         required=True,
-        strict=True,
+        validate=validate.URL(),
         metadata={
-            "description": "User ID who owns the product",
-            "example": 1
-        }
-    )
-    id = fields.Int(
-        required=True,
-        strict=True,
-        metadata={
-            "description": "Amazon product to be removed from tracking",
-            "example": 1
+            "description": "Amazon product URL to remove from tracking",
+            "example": "https://www.amazon.in/dp/B08XYZ1234"
         }
     )
 
 
 class CheckPriceSchema(Schema):
     """Schema for checking price of a product"""
-    user_id = fields.Int(
-        required=True,
-        strict=True,
-        metadata={
-            "description": "User ID who owns the product",
-            "example": 1
-        }
-    )
     url = fields.Str(
         required=True,
         validate=validate.URL(),
@@ -71,14 +47,6 @@ class CheckPriceSchema(Schema):
 
 class UpdateNotificationsSchema(Schema):
     """Schema for updating notification settings"""
-    user_id = fields.Int(
-        required=True,
-        strict=True,
-        metadata={
-            "description": "User ID whose notification settings to update",
-            "example": 1
-        }
-    )
     email = fields.Email(
         required=False,
         allow_none=True,
@@ -100,14 +68,6 @@ class UpdateNotificationsSchema(Schema):
 
 class SendNotificationSchema(Schema):
     """Schema for sending a notification manually"""
-    user_id = fields.Int(
-        required=True,
-        strict=True,
-        metadata={
-            "description": "User ID whose notification channels to use",
-            "example": 1
-        }
-    )
     title = fields.Str(
         required=True,
         validate=validate.Length(min=1, max=500),
@@ -138,7 +98,7 @@ class ProductSchema(Schema):
 class NotificationSettingsSchema(Schema):
     """Schema for notification settings response"""
     email = fields.Str(metadata={"description": "Email address"})
-    # phone_number = fields.Str(metadata={"description": "Phone number"})
+    phone_number = fields.Str(metadata={"description": "Phone number"})
 
 
 class SuccessResponseSchema(Schema):

@@ -48,18 +48,4 @@ config.json
 
 # OS
 .DS_Store
-
-# GitHub Actions / CI-CD artifacts
-.github/actions/*/dist/
-bandit-report.json
-trivy-results.sarif
-trivy-image-results.sarif
-coverage.xml
-htmlcov/
-
-# Test artifacts
-.pytest_cache/
-.coverage
-.coverage.*
-*,cover
 Thumbs.db

@@ -10,7 +10,7 @@ import logging
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.price_tracker import PriceTracker
-from core.notifications import send_mail
+from core.notifications import send_mail, send_whatsapp
 from core.price_history import PriceHistoryManager
 from api.schemas import (
     AddProductSchema,
@@ -19,8 +19,6 @@ from api.schemas import (
     UpdateNotificationsSchema,
     SendNotificationSchema
 )
-from database.db import get_db_session
-from database.models import User
 
 app = Flask(__name__)
 # Structured logging
@@ -116,125 +114,11 @@ def health():
     return jsonify({"status": "healthy", "message": "Amazon Price Tracker API is running"})
 
 
-# Users API
-@app.route('/api/users', methods=['POST'])
-def create_user():
-    """Create a new user: { email: str, name?: str }"""
-    try:
-        if not request.is_json:
-            return jsonify({"success": False, "error": "Request must be JSON"}), 400
-        data = request.json or {}
-        email = (data.get('email') or '').strip()
-        name = (data.get('name') or '').strip() or None
-        if not email:
-            return jsonify({"success": False, "error": "'email' is required"}), 400
-        # Basic email format check
-        if '@' not in email or '.' not in email.split('@')[-1]:
-            return jsonify({"success": False, "error": "Invalid email format"}), 400
-        db = get_db_session()
-        try:
-            # Check uniqueness
-            if db.query(User).filter(User.email == email).first():
-                return jsonify({"success": False, "error": "Email already exists"}), 409
-            user = User(email=email, name=name)
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            return jsonify({
-                "success": True,
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "name": user.name,
-                    "created_at": user.created_at.isoformat() if user.created_at else None
-                }
-            }), 201
-        finally:
-            db.close()
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/users', methods=['GET'])
-def list_users():
-    """List users, optionally filter by exact email: /api/users?email=..."""
-    try:
-        email = request.args.get('email')
-        db = get_db_session()
-        try:
-            q = db.query(User)
-            if email:
-                q = q.filter(User.email == email)
-            users = q.order_by(User.id.asc()).all()
-            return jsonify({
-                "success": True,
-                "users": [
-                    {
-                        "id": u.id,
-                        "email": u.email,
-                        "name": u.name,
-                        "created_at": u.created_at.isoformat() if u.created_at else None
-                    }
-                    for u in users
-                ],
-                "count": len(users)
-            })
-        finally:
-            db.close()
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/users/<int:user_id>', methods=['GET'])
-def get_user(user_id: int):
-    """Get a single user by id"""
-    try:
-        db = get_db_session()
-        try:
-            user = db.query(User).filter(User.id == user_id).first()
-            if not user:
-                return jsonify({"success": False, "error": "User not found"}), 404
-            return jsonify({
-                "success": True,
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "name": user.name,
-                    "created_at": user.created_at.isoformat() if user.created_at else None
-                }
-            })
-        finally:
-            db.close()
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/users/<int:user_id>', methods=['DELETE'])
-def delete_user(user_id: int):
-    """Delete a user and cascade their data (products, price history, notifications)"""
-    try:
-        db = get_db_session()
-        try:
-            user = db.query(User).filter(User.id == user_id).first()
-            if not user:
-                return jsonify({"success": False, "error": "User not found"}), 404
-            db.delete(user)
-            db.commit()
-            return jsonify({"success": True, "message": "User deleted"})
-        finally:
-            db.close()
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
 @app.route('/api/products', methods=['GET'])
 def get_products():
-    """Get all tracked products for a user"""
+    """Get all tracked products"""
     try:
-        user_id = request.args.get('user_id', type=int)
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' query parameter"}), 400
-        products = tracker.get_all_products(user_id)
+        products = tracker.get_all_products()
         return jsonify({
             "success": True,
             "products": products,
@@ -258,11 +142,10 @@ def add_product(validated_data):
     }
     """
     try:
-        user_id = validated_data['user_id']
         url = validated_data['url']
         threshold = validated_data['threshold']
         
-        product = tracker.add_product(user_id, url, threshold)
+        product = tracker.add_product(url, threshold)
         if product:
             return jsonify({
                 "success": True,
@@ -278,21 +161,22 @@ def add_product(validated_data):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/products/<int:product_id>', methods=['DELETE'])
-#@validate_request(remove_product_schema)
-#@require_amazon_url()
-def remove_product(product_id):
+@app.route('/api/products', methods=['DELETE'])
+@validate_request(remove_product_schema)
+@require_amazon_url()
+def remove_product(validated_data):
     """
-    Remove a product from tracking for a user
+    Remove a product from tracking
     
-    Query Parameter:
-        user_id (int): Required user ID
+    Request Body:
+    {
+        "url": "https://www.amazon.in/dp/B08XYZ1234"  # Required: Amazon product URL to remove
+    }
     """
     try:
-        user_id = request.args.get('user_id', type=int)
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' query parameter"}), 400
-        if tracker.remove_product(user_id, product_id):
+        url = validated_data['url']
+        
+        if tracker.remove_product(url):
             return jsonify({
                 "success": True,
                 "message": "Product removed successfully"
@@ -319,10 +203,9 @@ def check_price(validated_data):
     }
     """
     try:
-        user_id = validated_data['user_id']
         url = validated_data['url']
         
-        product = tracker.check_price(user_id, url)
+        product = tracker.check_price(url)
         if product:
             return jsonify({
                 "success": True,
@@ -339,12 +222,9 @@ def check_price(validated_data):
 
 @app.route('/api/products/update-all', methods=['POST'])
 def update_all_prices():
-    """Update prices for all tracked products for a user"""
+    """Update prices for all tracked products"""
     try:
-        user_id = request.args.get('user_id', type=int) or (request.json or {}).get('user_id')
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' parameter"}), 400
-        products = tracker.update_all_prices(int(user_id))
+        products = tracker.update_all_prices()
         return jsonify({
             "success": True,
             "message": f"Updated {len(products)} products",
@@ -356,12 +236,9 @@ def update_all_prices():
 
 @app.route('/api/notifications', methods=['GET'])
 def get_notifications():
-    """Get notification settings for a user"""
+    """Get notification settings"""
     try:
-        user_id = request.args.get('user_id', type=int)
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' query parameter"}), 400
-        notifications = tracker.get_notifications(user_id)
+        notifications = tracker.get_notifications()
         return jsonify({
             "success": True,
             "notifications": notifications
@@ -383,15 +260,14 @@ def update_notifications(validated_data):
     }
     """
     try:
-        user_id = validated_data['user_id']
         email = validated_data.get('email')
         phone_number = validated_data.get('phone_number')
         
-        tracker.update_notifications(user_id=user_id, email=email, phone_number=phone_number)
+        tracker.update_notifications(email=email, phone_number=phone_number)
         return jsonify({
             "success": True,
             "message": "Notification settings updated",
-            "notifications": tracker.get_notifications(user_id)
+            "notifications": tracker.get_notifications()
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -407,24 +283,23 @@ def send_notification(validated_data):
     
     """
     try:
-        user_id = validated_data['user_id']
         title = validated_data['title']
         url = validated_data['url']
         
-        notifications = tracker.get_notifications(user_id)
+        notifications = tracker.get_notifications()
         email = notifications.get("email")
-        # phone_number = notifications.get("phone_number")
+        phone_number = notifications.get("phone_number")
         
         results = {
             "email_sent": False,
-            # "whatsapp_sent": False
+            "whatsapp_sent": False
         }
         
         if email:
             results["email_sent"] = send_mail(email, title, url)
         
-        # if phone_number:
-        #     results["whatsapp_sent"] = send_whatsapp(phone_number, title, url)
+        if phone_number:
+            results["whatsapp_sent"] = send_whatsapp(phone_number, title, url)
         
         return jsonify({
             "success": True,
@@ -438,19 +313,17 @@ def send_notification(validated_data):
 @app.route('/api/track/check', methods=['POST'])
 def check_and_alert():
     """
-    Check all products for a user and send alerts if prices drop below threshold.
+    Check all products and send alerts if prices drop below threshold.
+    This applies the main logic from amazon_price.py
     """
     try:
-        user_id = request.args.get('user_id', type=int) or (request.json or {}).get('user_id')
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' parameter"}), 400
-        alerted = tracker.check_and_alert(int(user_id))
+        alerted = tracker.check_and_alert()
         
         return jsonify({
             "success": True,
             "message": f"Checked all products. {len(alerted)} alert(s) sent.",
             "alerted_products": alerted,
-            "remaining_products": len(tracker.get_all_products(int(user_id)))
+            "remaining_products": len(tracker.get_all_products())
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -465,11 +338,8 @@ def get_all_history():
         limit (int, optional): Maximum number of entries per product to return
     """
     try:
-        user_id = request.args.get('user_id', type=int)
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' query parameter"}), 400
         limit = request.args.get('limit', type=int)
-        all_history = history_manager.get_all_history(user_id)
+        all_history = history_manager.get_all_history()
         
         # Apply limit if specified
         if limit:
@@ -485,41 +355,41 @@ def get_all_history():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/history/by-id', methods=['GET'])
-def get_product_history_by_id():
+@app.route('/api/history/by-url', methods=['GET'])
+def get_product_history_by_query():
     """
-    Get price history for a specific product via product_id
+    Get price history for a specific product via query parameter
     
     Query Parameters:
-        user_id (int, required)
-        product_id (int, required)
+        url (str, required): The product URL (unencoded)
         limit (int, optional): Maximum number of entries to return
         stats (bool, optional): Include statistics (default: false)
     """
     try:
-        user_id = request.args.get('user_id', type=int)
-        product_id = request.args.get('product_id', type=int)
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' query parameter"}), 400
-        if not product_id:
-            return jsonify({"success": False, "error": "Missing 'product_id' query parameter"}), 400
+        import urllib.parse
+        url = request.args.get('url')
+        if not url:
+            return jsonify({"success": False, "error": "Missing 'url' query parameter"}), 400
+        url = urllib.parse.unquote(url)
+        if not is_amazon_url(url):
+            return jsonify({"success": False, "error": "Invalid URL. Only Amazon product URLs are allowed."}), 400
 
         limit = request.args.get('limit', type=int)
         include_stats = request.args.get('stats', 'false').lower() == 'true'
 
         if include_stats:
-            stats = history_manager.get_price_statistics_by_product_id(user_id, product_id)
+            stats = history_manager.get_price_statistics(url)
             if stats:
                 return jsonify({"success": True, "statistics": stats})
             else:
                 return jsonify({"success": False, "error": "Product history not found"}), 404
         else:
-            history = history_manager.get_price_history_by_product_id(user_id, product_id, limit=limit)
+            history = history_manager.get_price_history(url, limit=limit)
             if history is not None:
-                product_info = history_manager.get_product_info_by_product_id(user_id, product_id)
+                product_info = history_manager.get_product_info(url)
                 return jsonify({
                     "success": True,
-                    "product_id": product_id,
+                    "url": url,
                     "title": product_info["title"] if product_info else None,
                     "threshold": product_info["threshold"] if product_info else None,
                     "entries": history,
@@ -531,18 +401,19 @@ def get_product_history_by_id():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/history/stats/by-id', methods=['GET'])
-def get_product_stats_by_id():
-    """Get price statistics for a specific product via product_id"""
+@app.route('/api/history/stats/by-url', methods=['GET'])
+def get_product_stats_by_query():
+    """Get price statistics for a specific product via query parameter"""
     try:
-        user_id = request.args.get('user_id', type=int)
-        product_id = request.args.get('product_id', type=int)
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' query parameter"}), 400
-        if not product_id:
-            return jsonify({"success": False, "error": "Missing 'product_id' query parameter"}), 400
+        import urllib.parse
+        url = request.args.get('url')
+        if not url:
+            return jsonify({"success": False, "error": "Missing 'url' query parameter"}), 400
+        url = urllib.parse.unquote(url)
+        if not is_amazon_url(url):
+            return jsonify({"success": False, "error": "Invalid URL. Only Amazon product URLs are allowed."}), 400
 
-        stats = history_manager.get_price_statistics_by_product_id(user_id, product_id)
+        stats = history_manager.get_price_statistics(url)
         if stats:
             return jsonify({"success": True, "statistics": stats})
         else:
@@ -551,26 +422,25 @@ def get_product_stats_by_id():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/history/<int:product_id>', methods=['GET'])
-def get_product_history_by_path(product_id: int):
+@app.route('/api/history/<path:url>', methods=['GET'])
+def get_product_history(url):
     """
-    Get price history for a specific product by product_id
+    Get price history for a specific product
     
     Query Parameters:
-        user_id (int, required)
-        limit (int, optional)
-        stats (bool, optional)
+        limit (int, optional): Maximum number of entries to return
+        stats (bool, optional): Include statistics (default: false)
     """
     try:
-        user_id = request.args.get('user_id', type=int)
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' query parameter"}), 400
+        import urllib.parse
+        url = urllib.parse.unquote(url)
         
         limit = request.args.get('limit', type=int)
         include_stats = request.args.get('stats', 'false').lower() == 'true'
         
         if include_stats:
-            stats = history_manager.get_price_statistics_by_product_id(user_id, product_id)
+            # Return with statistics
+            stats = history_manager.get_price_statistics(url)
             if stats:
                 return jsonify({
                     "success": True,
@@ -582,12 +452,13 @@ def get_product_history_by_path(product_id: int):
                     "error": "Product history not found"
                 }), 404
         else:
-            history = history_manager.get_price_history_by_product_id(user_id, product_id, limit=limit)
+            # Return just history entries
+            history = history_manager.get_price_history(url, limit=limit)
             if history is not None:
-                product_info = history_manager.get_product_info_by_product_id(user_id, product_id)
+                product_info = history_manager.get_product_info(url)
                 return jsonify({
                     "success": True,
-                    "product_id": product_id,
+                    "url": url,
                     "title": product_info["title"] if product_info else None,
                     "threshold": product_info["threshold"] if product_info else None,
                     "entries": history,
@@ -602,17 +473,16 @@ def get_product_history_by_path(product_id: int):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/history/<int:product_id>/stats', methods=['GET'])
-def get_product_stats_by_path(product_id: int):
+@app.route('/api/history/<path:url>/stats', methods=['GET'])
+def get_product_stats(url):
     """
-    Get price statistics for a specific product by product_id
+    Get price statistics for a specific product
     """
     try:
-        user_id = request.args.get('user_id', type=int)
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' query parameter"}), 400
+        import urllib.parse
+        url = urllib.parse.unquote(url)
         
-        stats = history_manager.get_price_statistics_by_product_id(user_id, product_id)
+        stats = history_manager.get_price_statistics(url)
         if stats:
             return jsonify({
                 "success": True,
@@ -627,17 +497,16 @@ def get_product_stats_by_path(product_id: int):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/history/<int:product_id>', methods=['DELETE'])
-def delete_product_history_by_id(product_id: int):
+@app.route('/api/history/<path:url>', methods=['DELETE'])
+def delete_product_history(url):
     """
-    Delete price history for a specific product by product_id
+    Delete price history for a specific product
     """
     try:
-        user_id = request.args.get('user_id', type=int)
-        if not user_id:
-            return jsonify({"success": False, "error": "Missing 'user_id' query parameter"}), 400
+        import urllib.parse
+        url = urllib.parse.unquote(url)
         
-        if history_manager.remove_product_history_by_product_id(user_id, product_id):
+        if history_manager.remove_product_history(url):
             return jsonify({
                 "success": True,
                 "message": "Price history deleted successfully"

@@ -1,236 +1,199 @@
-# Amazon Price Tracker (Multi-User, API-first)
+# Amazon Price Tracker
 
-A container-ready Flask API that tracks Amazon product prices, stores history in PostgreSQL, and sends notifications on price drops. The app now supports multiple users. Each user owns products, history, and notification settings. History APIs use product_id.
-
-- API-first service (Flask)
-- PostgreSQL storage via SQLAlchemy
-- Multi-user domain model (Users own Products; PriceHistory ties to Products; NotificationSettings per User)
-- Price history and statistics per product
-- Email notifications
-- Docker + GitHub Actions + GCP (Cloud Run/GKE) friendly
-
-## Contents
-- Features
-- Architecture
-- Data Model
-- Setup (Local)
-- Running (Local)
-- API Overview
-- Environment Variables
-- Docker
-- CI/CD to GCP (via GitHub Actions)
-- Project Structure
-
----
+A standalone application and REST API for tracking Amazon product prices with database storage and receiving notifications when prices drop below your threshold.
 
 ## Features
-- Track multiple Amazon products per user
-- Price history and statistics (min, max, average, change)
-- Email notifications per user
-- REST API with validation
-- Dockerized; deployable to Cloud Run/GKE
 
-## Architecture
-- Flask API in api/app.py
-- Core services in core/
-  - price_tracker.py: fetch prices, manage products, notifications (user-scoped)
-  - price_history.py: retrieve/manage history (user-scoped, product_id-based)
-  - notifications.py: email sending
-- Database layer in database/
-  - db.py: session and engine
-  - models.py: SQLAlchemy models (User, Product, PriceHistory, NotificationSettings)
+- 🛒 Track multiple Amazon products
+- 📧 Email notifications when prices drop
+- 📱 WhatsApp notifications when prices drop
+- 💾 **PostgreSQL Database** - All data stored in database (products, price history, settings)
+- 📊 Price history tracking - stores all price changes over time
+- 📈 Price statistics - view lowest, highest, average prices and trends
+- 🖥️ Standalone GUI application
+- 🌐 REST API for programmatic access
+- 🔄 Automatic price checking every 2 hours
 
-## Data Model
-- users
-  - id, email (unique), name, timestamps
-- products
-  - id, user_id (FK), url, title, threshold, current_price, is_active, timestamps
-  - unique constraint: (user_id, url)
-- price_history
-  - id, product_id (FK), price, timestamp
-- notification_settings
-  - id, user_id (unique FK), email, phone_number, timestamps
+## Installation
 
-## Setup (Local)
-1) Python dependencies
+1. Clone or download this repository
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Initialize the database:
+```bash
+python init_db.py
+```
+
+4. Configure your settings:
+   - Edit `.env` file with your email credentials
+   - Configure notifications via API 
+
+## Database
+
+The application uses **PostgreSQL** database by default to store:
+- Products (URL, title, threshold, current price)
+- Price history (all price changes with timestamps)
+- Notification settings (email, phone number)
+
+### PostgreSQL Setup
+
+1. **Install PostgreSQL** (if not already installed):
    ```bash
-   pip install -r requirements.txt
+   # Ubuntu/Debian
+   sudo apt-get install postgresql postgresql-contrib
+   
+   # macOS (using Homebrew)
+   brew install postgresql
+   brew services start postgresql
+   
+   # Windows: Download from https://www.postgresql.org/download/windows/
    ```
 
-2) Configure environment
-   Create .env (see Environment Variables section):
-   - DATABASE_URL is required (PostgreSQL)
-   - EMAIL_ID/EMAIL_PASS/SMTP_SERVER/SMTP_PORT for email notifications
+2. **Create Database**:
+   ```bash
+   # Connect to PostgreSQL
+   sudo -u postgres psql
+   
+   # Create database and user
+   CREATE DATABASE price_tracker;
+   CREATE USER price_tracker_user WITH PASSWORD 'your_password';
+   GRANT ALL PRIVILEGES ON DATABASE Db_name TO db_name_user;
+   \q
+   ```
 
-3) Initialize database tables
-   The app auto-creates tables on first run. For schema changes from older versions, drop and recreate or migrate.
+3. **Configure Database Connection** in `.env`:
+   ```env
+   # Option 1: Full connection string (recommended)
+   DATABASE_URL=postgresql://price_tracker_user:your_password@localhost:5432/db_name
+   
+   # Option 2: Individual components
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_NAME=Db_name
+   DB_USER=Db_user
+   DB_PASSWORD=your_password
+   ```
 
-## Running (Local)
-- API server
-  ```bash
-  python run_api.py
-  ```
-  Default: http://localhost:5000
+4. **Initialize Database Tables**:
+   ```bash
+   python init_db.py
+   ```
 
-- Tracker loop for a specific user (optional utility)
-  ```bash
-  python run_tracker.py <user_id>
-  ```
 
-## API Overview
-All user-specific endpoints require user_id. Price history uses product_id.
+### Database Schema
 
-Health
-- GET /api/health
+- **products**: Stores tracked products
+- **price_history**: Stores price history entries
+- **notification_settings**: Stores notification configuration
 
-Users
-- POST /api/users
-  - Body: { email: string, name?: string }
-- GET /api/users[?email=...]
-- GET /api/users/{user_id}
-- DELETE /api/users/{user_id}
+### Command-Line Tracker (Original Logic)
 
-Products
-- GET /api/products?user_id={int}
-- POST /api/products
-  - Body: { user_id: int, url: string, threshold: number }
-- DELETE /api/products/{product_id}?user_id={int}
-- POST /api/products/check
-  - Body: { user_id: int, url: string }
-- POST /api/products/update-all?user_id={int}
-  - Or in body: { user_id: int }
-
-Notifications
-- GET /api/notifications?user_id={int}
-- PUT /api/notifications
-  - Body: { user_id: int, email?: string, phone_number?: string }
-- POST /api/notifications/send (alias: /api/notify)
-  - Body: { user_id: int, title: string, url: string }
-
-Tracking
-- POST /api/track/check
-  - user_id via query or body
-
-Price History (product_id-based)
-- GET /api/history?user_id={int}[&limit={int}]
-  - All products’ histories for the user (keys by product URL)
-- GET /api/history/by-id?user_id={int}&product_id={int}[&limit={int}][&stats=true|false]
-  - stats=true -> statistics; otherwise entries + product info
-- GET /api/history/stats/by-id?user_id={int}&product_id={int}
-- GET /api/history/{product_id}?user_id={int}[&limit={int}][&stats=true|false]
-- GET /api/history/{product_id}/stats?user_id={int}
-- DELETE /api/history/{product_id}?user_id={int}
-
-Notes
-- URL-based history endpoints have been replaced by product_id-based endpoints per current logic.
-
-## Environment Variables (.env)
-Required
-- DATABASE_URL=postgresql://USER:PASS@HOST:PORT/DB
-- CORS_ORIGIN=* (or your frontend origin)
-
-Email (optional but recommended for alerts)
-- EMAIL_ID
-- EMAIL_PASS
-- SMTP_SERVER (e.g., smtp.gmail.com)
-- SMTP_PORT (e.g., 587 or 465)
-
-## Docker
-Build & run locally
+Run the standalone tracker script:
 ```bash
-docker build -t amazon-price-tracker:local .
-# Run API on port 5000
-docker run -p 5000:5000 --env-file .env amazon-price-tracker:local
+python run_tracker.py
 ```
 
-## CI/CD to GCP via GitHub Actions
-Overview
-- Push to GitHub main triggers GitHub Actions workflow to:
-  - Authenticate to GCP (via service account key)
-  - Build Docker image
-  - Push to Artifact Registry (or GCR)
-  - Deploy to Cloud Run (or apply to GKE)
+### API Server
 
-Secrets (in GitHub repo -> Settings -> Secrets and variables -> Actions)
-- GCP_PROJECT_ID
-- GCP_REGION (e.g., us-central1)
-- GCP_SA_KEY (JSON contents of service account key)
-- SERVICE_NAME (e.g., amazon-price-tracker)
-- REGISTRY_REPO (Artifact Registry repo name, e.g., app-images)
-- App env vars: DATABASE_URL, CORS_ORIGIN, EMAIL_ID, EMAIL_PASS, SMTP_SERVER, SMTP_PORT
-
-Example Cloud Run workflow (.github/workflows/deploy-cloudrun.yml)
-```yaml
-name: Build and Deploy to Cloud Run
-on:
-  push:
-    branches: [ "main" ]
-env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: ${{ secrets.GCP_REGION }}
-  SERVICE_NAME: ${{ secrets.SERVICE_NAME }}
-  REPO_NAME: ${{ secrets.REGISTRY_REPO }}
-  IMAGE: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.REGISTRY_REPO }}/${{ secrets.SERVICE_NAME }}
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: google-github-actions/setup-gcloud@v2
-      with:
-        project_id: ${{ env.PROJECT_ID }}
-        service_account_key: ${{ secrets.GCP_SA_KEY }}
-        export_default_credentials: true
-    - run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
-    - name: Build and push image
-      run: |
-        SHORT_SHA=$(git rev-parse --short HEAD)
-        docker build -t $IMAGE:$SHORT_SHA -t $IMAGE:latest .
-        docker push $IMAGE:$SHORT_SHA
-        docker push $IMAGE:latest
-    - name: Deploy to Cloud Run
-      run: |
-        gcloud run deploy $SERVICE_NAME \
-          --image $IMAGE:latest \
-          --region $REGION \
-          --platform managed \
-          --allow-unauthenticated \
-          --port 5000 \
-          --set-env-vars "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},DATABASE_URL=${{ secrets.DATABASE_URL }},EMAIL_ID=${{ secrets.EMAIL_ID }},EMAIL_PASS=${{ secrets.EMAIL_PASS }},SMTP_SERVER=${{ secrets.SMTP_SERVER }},SMTP_PORT=${{ secrets.SMTP_PORT }}"
+Start the API server:
+```bash
+python run_api.py
 ```
 
-GCP prerequisites
-- Enable APIs: artifactregistry.googleapis.com, run.googleapis.com, cloudbuild.googleapis.com
-- Artifact Registry repo created: e.g., app-images in REGION
-- Service Account with roles: artifactregistry.writer, run.admin, iam.serviceAccountUser
+The API will be available at `http://localhost:5000`
+
+## API Endpoints
+
+See `api/API_DOCUMENTATION.md` for complete API documentation.
+
+### Main Endpoints:
+- `GET /api/health` - Health check
+- `GET /api/products` - Get all products
+- `POST /api/products` - Add a product
+- `DELETE /api/products` - Remove a product
+- `POST /api/products/check` - Check price
+- `POST /api/products/update-all` - Update all prices
+- `GET /api/notifications` - Get notification settings
+- `PUT /api/notifications` - Update notification settings
+- `GET /api/history` - Get all price history
+- `GET /api/history/<url>` - Get product price history
+- `GET /api/history/<url>/stats` - Get price statistics
+
+
+The executables will be created in the `dist` directory.
+
+## Configuration
+
+### Environment Variables (.env)
+```
+# Email Configuration
+EMAIL_ID=your@email.com
+EMAIL_PASS=your_password
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+
+# PostgreSQL Database Configuration
+DATABASE_URL=postgresql://username:password@localhost:5432/Db_name
+# OR use individual components:
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_NAME=price_tracker
+# DB_USER=Db_user
+# DB_PASSWORD=Db-Password
 
 ## Project Structure
-```
+
 Amazon_Price_Tracker/
-├── api/
-│   ├── app.py               # Flask API
-│   └── schemas.py           # Marshmallow schemas
-├── core/
-│   ├── price_tracker.py     # User-scoped product + notifications
-│   ├── price_history.py     # User-scoped history (product_id-based)
-│   ├── notifications.py     # Email sender
-│   └── url_utils.py
-├── database/
-│   ├── db.py                # Engine and sessions
-│   ├── models.py            # User, Product, PriceHistory, NotificationSettings
-│   └── test_connection.py
-├── Dockerfile
-├── docker-compose.yml
-├── k8s-deployment.yaml
-├── run_api.py
-├── run_tracker.py
-├── requirements.txt
-├── init_db.py
-└── README.md
-```
+├── core/                 # Core functionality
+│   ├── __init__.py
+│   ├── price_tracker.py  # Price tracking logic with DB
+│   ├── price_history.py  # Price history management
+│   └── notifications.py  # Notification functions
+├── database/             # Database layer
+│   ├── __init__.py
+│   ├── db.py            # Database connection
+│   └── models.py        # SQLAlchemy models
+├── api/                  # REST API
+│   ├── app.py           # Flask API server
+│   └── schemas.py       # Request validation schemas
+├── gui/                  # GUI application
+│   └── app.py           # Tkinter GUI
+├── run_api.py           # API server entry point
+├── run_gui.py           # GUI application entry point
+├── run_tracker.py       # Standalone tracker
+├── init_db.py           # Database initialization script
+├── price_tracker.db     # SQLite database (only if USE_SQLITE=true)
+├── config.json          # Legacy config (optional)
+├── .env                 # Environment variables
+└── requirements.txt     # Python dependencies
+
+
+## Database Migration
+
+If you have existing data in `config.json` and `price_history.json`, you can migrate to the database:
+
+1. The application will automatically create products from config.json on first run
+2. Price history will be created as you check prices
 
 ## Notes
-- All API operations are scoped by user_id.
-- History endpoints require product_id.
-- For legacy deployments, re-create tables or migrate to the new schema.
-- Consider using gunicorn for production serving behind Cloud Run; development uses Flask’s built-in server.
+
+- The application checks prices every 2 hours when tracking is active
+- Products are marked as inactive (not deleted) after price alert is sent
+- Price history is automatically saved to database whenever prices are checked
+- Make sure your email credentials are correct for email notifications
+- WhatsApp notifications require the phone number to be in international format (e.g., +919876543210)
+- tkinter is part of Python's standard library - if GUI doesn't work, install: `sudo apt-get install python3-tk` (Linux)
+- PostgreSQL database must be set up before first run (see Database Setup above)
+- SQLite database (`price_tracker.db`) is created automatically if `USE_SQLITE=true`
+
+## Requirements
+
+- Python 3.7+
+- See `requirements.txt` for all dependencies
+
+## License
+
+This project is open source and available for personal use.

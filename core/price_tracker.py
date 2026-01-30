@@ -128,8 +128,20 @@ class PriceTracker:
 
             # Save to database (price history is saved in _save_price_to_db)
             if title and price:
-                # Note: do not update any product without explicit user context
-                pass
+                # Update product if exists, price history will be saved separately
+                product = self.db.query(Product).filter(Product.url == final_url).first()
+                if product:
+                    product.title = title
+                    product.current_price = price
+                    product.updated_at = datetime.utcnow()
+                    # Add price history entry
+                    history_entry = PriceHistory(
+                        product_id=product.id,
+                        price=price,
+                        timestamp=datetime.utcnow()
+                    )
+                    self.db.add(history_entry)
+                    self.db.commit()
 
             return title, price, final_url
         except Exception as e:
@@ -137,12 +149,11 @@ class PriceTracker:
             return None, None, None
     
     
-    def add_product(self, user_id, url, threshold):
+    def add_product(self, url, threshold):
         """
-        Add a product to track for a user
+        Add a product to track
         
         Args:
-            user_id (int): Owner user id
             url (str): Amazon product URL
             threshold (float): Price threshold for alert
             
@@ -152,12 +163,8 @@ class PriceTracker:
         title, current_price, resolved_url = self.get_price(url)
         if title and current_price:
             try:
-                # Check if product already exists for this user (use resolved/canonical URL)
-                product = (
-                    self.db.query(Product)
-                    .filter(Product.user_id == user_id, Product.url == resolved_url)
-                    .first()
-                )
+                # Check if product already exists (use resolved/canonical URL)
+                product = self.db.query(Product).filter(Product.url == resolved_url).first()
                 
                 if product:
                     # Update existing product
@@ -169,7 +176,6 @@ class PriceTracker:
                 else:
                     # Create new product
                     product = Product(
-                        user_id=user_id,
                         url=resolved_url,
                         title=title,
                         threshold=threshold,
@@ -203,19 +209,18 @@ class PriceTracker:
                 return None
         return None
     
-    def remove_product(self, user_id, product_id):
+    def remove_product(self, url):
         """
-        Remove a product from tracking (marks as inactive) for a user
+        Remove a product from tracking (marks as inactive)
         
+        Args:
+            url (str): Amazon product URL to remove
+            
         Returns:
             bool: True if removed, False if not found
         """
         try:
-            product = (
-                self.db.query(Product)
-                .filter(Product.id == product_id, Product.user_id == user_id)
-                .first()
-            )
+            product = self.db.query(Product).filter(Product.url == url).first()
             if product:
                 product.is_active = False
                 self.db.commit()
@@ -226,14 +231,10 @@ class PriceTracker:
             print(f"Error removing product: {e}")
             return False
     
-    def get_all_products(self, user_id):
-        """Get all active tracked products for a user"""
+    def get_all_products(self):
+        """Get all active tracked products"""
         try:
-            products = (
-                self.db.query(Product)
-                .filter(Product.is_active == True, Product.user_id == user_id)
-                .all()
-            )
+            products = self.db.query(Product).filter(Product.is_active == True).all()
             return [
                 {
                     "id": p.id,
@@ -250,14 +251,10 @@ class PriceTracker:
             print(f"Error getting products: {e}")
             return []
     
-    def update_all_prices(self, user_id):
-        """Update prices for all tracked products for a user"""
+    def update_all_prices(self):
+        """Update prices for all tracked products"""
         try:
-            products = (
-                self.db.query(Product)
-                .filter(Product.is_active == True, Product.user_id == user_id)
-                .all()
-            )
+            products = self.db.query(Product).filter(Product.is_active == True).all()
             updated_products = []
             
             for product in products:
@@ -281,21 +278,20 @@ class PriceTracker:
             print(f"Error updating prices: {e}")
             return []
     
-    def check_price(self, user_id, url):
+    def check_price(self, url):
         """
-        Check price for a specific product for a user
+        Check price for a specific product
         
+        Args:
+            url (str): Amazon product URL
+            
         Returns:
             dict: Product info with updated price
         """
         title, current_price, resolved_url = self.get_price(url)
         if title and current_price:
             try:
-                product = (
-                    self.db.query(Product)
-                    .filter(Product.url == resolved_url, Product.user_id == user_id)
-                    .first()
-                )
+                product = self.db.query(Product).filter(Product.url == resolved_url).first()
                 if product:
                     product.title = title
                     product.current_price = current_price
@@ -323,22 +319,18 @@ class PriceTracker:
                 return None
         return None
     
-    def update_notifications(self, user_id, email=None, phone_number=None):
+    def update_notifications(self, email=None, phone_number=None):
         """
-        Update notification settings for a user
+        Update notification settings
+        
+        Args:
+            email (str): Email address for notifications
+            phone_number (str): Phone number for WhatsApp notifications
         """
         try:
-            settings = (
-                self.db.query(NotificationSettings)
-                .filter(NotificationSettings.user_id == user_id)
-                .first()
-            )
+            settings = self.db.query(NotificationSettings).first()
             if not settings:
-                settings = NotificationSettings(
-                    user_id=user_id,
-                    email=email or "",
-                    phone_number=phone_number or "",
-                )
+                settings = NotificationSettings(email=email or "", phone_number=phone_number or "")
                 self.db.add(settings)
             else:
                 if email is not None:
@@ -352,42 +344,47 @@ class PriceTracker:
             self.db.rollback()
             print(f"Error updating notifications: {e}")
     
-    def get_notifications(self, user_id):
-        """Get notification settings for a user"""
+    def get_notifications(self):
+        """Get notification settings"""
         try:
-            settings = (
-                self.db.query(NotificationSettings)
-                .filter(NotificationSettings.user_id == user_id)
-                .first()
-            )
+            settings = self.db.query(NotificationSettings).first()
             if settings:
                 return {
-                    "email": settings.email or ""
+                    "email": settings.email or "",
+                    "phone_number": settings.phone_number or ""
                 }
-            return {"email": ""}
+            return {"email": "", "phone_number": ""}
         except Exception as e:
             print(f"Error getting notifications: {e}")
             return {"email": "", "phone_number": ""}
     
     @property
     def config(self):
-        """Deprecated: no global config without user context"""
-        return {}
+        """Compatibility property for backward compatibility"""
+        return {
+            "notifications": self.get_notifications(),
+            "products": self.get_all_products()
+        }
     
-    def check_and_alert(self, user_id, callback=None):
+    def check_and_alert(self, callback=None):
         """
-        Check all products for a user and send alerts if prices drop below threshold.
-        """
-        from core.notifications import send_mail
+        Check all products and send alerts if price drops below threshold.
+        This implements the main tracking logic from amazon_price.py
         
-        notifications = self.get_notifications(user_id)
+        Args:
+            callback (callable): Optional callback function called for each product check.
+                                Receives (title, current_price, threshold, url) as arguments.
+        
+        Returns:
+            list: List of products that triggered alerts (were removed)
+        """
+        from core.notifications import send_mail, send_whatsapp
+        
+        notifications = self.get_notifications()
         to_email = notifications.get("email")
+        phone_number = notifications.get("phone_number")
         
-        products = (
-            self.db.query(Product)
-            .filter(Product.is_active == True, Product.user_id == user_id)
-            .all()
-        )
+        products = self.db.query(Product).filter(Product.is_active == True).all()
         alerted_products = []
         
         for product in products:
@@ -396,15 +393,20 @@ class PriceTracker:
             
             title, current_price, _ = self.get_price(url)
             if title and current_price:
+                # Call callback if provided
                 if callback:
                     callback(title, current_price, threshold, url)
                 else:
                     print(f"{title} -> ₹{current_price} (Target: ₹{threshold})")
                 
                 if current_price <= threshold:
+                    # Price dropped below threshold - send alerts
                     if to_email:
                         send_mail(to_email, title, url)
+                    if phone_number:
+                        send_whatsapp(phone_number, title, url)
                     
+                    # Mark product as inactive (stop tracking once alert sent)
                     product.is_active = False
                     self.db.commit()
                     
