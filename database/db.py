@@ -33,20 +33,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def init_db():
-    """Initialize database - create all tables and seed defaults if needed"""
+    """Initialize database - create all tables"""
     Base.metadata.create_all(bind=engine)
-    
-    # Initialize notification settings if not exists
-    db = SessionLocal()
-    try:
-        from database.models import NotificationSettings
-        settings = db.query(NotificationSettings).first()
-        if not settings:
-            settings = NotificationSettings(email="", phone_number="")
-            db.add(settings)
-            db.commit()
-    finally:
-        db.close()
 
 
 def get_db() -> Session:

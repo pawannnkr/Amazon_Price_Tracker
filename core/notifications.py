@@ -23,31 +23,31 @@ except Exception:
     SMTP_PORT = 587
 
 # Optional WhatsApp Cloud API configuration
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
-WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+# WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
+# WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 
 # Lazy import for pywhatkit to avoid display connection errors when not needed
-_pywhatkit = None
+# _pywhatkit = None
 
-def _get_pywhatkit():
-    """Lazy import of pywhatkit to avoid display connection errors"""
-    global _pywhatkit
-    if _pywhatkit is None:
-        try:
-            import pywhatkit
-            _pywhatkit = pywhatkit
-        except Exception as e:
-            print(f"⚠️ Warning: pywhatkit not available: {e}")
-            _pywhatkit = False  # Mark as unavailable
-    return _pywhatkit
+# def _get_pywhatkit():
+#     """Lazy import of pywhatkit to avoid display connection errors"""
+#     global _pywhatkit
+#     if _pywhatkit is None:
+#         try:
+#             import pywhatkit
+#             _pywhatkit = pywhatkit
+#         except Exception as e:
+#             print(f"⚠️ Warning: pywhatkit not available: {e}")
+#             _pywhatkit = False  # Mark as unavailable
+#     return _pywhatkit
 
 
-def _has_display():
-    """Detect if a GUI/display is available (for pywhatkit)."""
-    if platform.system() == "Linux":
-        return bool(os.getenv("DISPLAY"))
-    # On Windows/macOS assume a display is present when running interactively
-    return True
+# def _has_display():
+#     """Detect if a GUI/display is available (for pywhatkit)."""
+#     if platform.system() == "Linux":
+#         return bool(os.getenv("DISPLAY"))
+#     # On Windows/macOS assume a display is present when running interactively
+#     return True
 
 
 def send_mail(to_email, title, url):
@@ -68,7 +68,7 @@ def send_mail(to_email, title, url):
         body = f"Price of {title} has dropped!\n\nCheck it here: {url}"
 
         msg = MIMEMultipart()
-        msg["From"] = formataddr(("Amazon Price Tracker", EMAIL_ID))
+        msg["From"] = formataddr(("PriceSnap", EMAIL_ID))
         msg["To"] = to_email
         msg["Subject"] = str(Header(subject, "utf-8"))
         msg.attach(MIMEText(body, "plain", "utf-8"))
@@ -95,7 +95,7 @@ def send_mail(to_email, title, url):
         return False
 
 
-def _send_whatsapp_cloud(phone_number, message):
+# def _send_whatsapp_cloud(phone_number, message):
     """Send WhatsApp message using the WhatsApp Cloud API if configured."""
     if not WHATSAPP_TOKEN or not WHATSAPP_PHONE_NUMBER_ID:
         return None  # Not configured
@@ -123,7 +123,7 @@ def _send_whatsapp_cloud(phone_number, message):
         return False
 
 
-def send_whatsapp(phone_number, title, url):
+# def send_whatsapp(phone_number, title, url):
     """
     Send WhatsApp notification for price drop.
 

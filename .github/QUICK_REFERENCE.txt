@@ -1,0 +1,199 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                  PRICESNAP CI/CD QUICK REFERENCE CARD                      ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📋 GITHUB ACTIONS WORKFLOWS (6 total)
+────────────────────────────────────────────────────────────────────────────
+
+1. lint-and-test.yml
+   Trigger:  Push/PR to main, develop
+   Time:     5-10 min
+   Tests:    Python 3.10, 3.11, 3.12 + PostgreSQL
+   Status:   ✅ Ready to use (no secrets needed)
+
+2. build-docker.yml
+   Trigger:  Push/tag to main, develop
+   Time:     3-5 min
+   Output:   Image to GHCR (ghcr.io/pawannnkr/PriceSnap)
+   Status:   ✅ Ready to use
+
+3. deploy-cloudrun.yml
+   Trigger:  Push to main / Manual dispatch
+   Time:     5-10 min
+   Deploy:   Google Cloud Run (serverless)
+   Status:   ⏳ Needs GCP secrets (Phase 3-4 of checklist)
+
+4. deploy-gke.yml
+   Trigger:  Push to main / Manual dispatch
+   Time:     8-15 min
+   Deploy:   Google Kubernetes Engine
+   Status:   ⏳ Needs GCP secrets (Phase 3, 5 of checklist)
+
+5. security-scan.yml
+   Trigger:  Push/PR to main, weekly schedule
+   Time:     5-10 min
+   Scans:    Bandit, Safety, pip-audit, Trivy
+   Status:   ✅ Ready to use
+
+6. release.yml
+   Trigger:  Git tag push (v1.0.0)
+   Time:     5-10 min
+   Creates:  GitHub Release + images to GHCR & GCP
+   Status:   ⏳ Needs GCP secrets (Phase 3 of checklist)
+
+────────────────────────────────────────────────────────────────────────────
+
+📚 DOCUMENTATION FILES (Start with ➊)
+────────────────────────────────────────────────────────────────────────────
+
+ ➊  .github/README.md               ← You are here! High-level overview
+    
+ ➋  .github/SETUP_CHECKLIST.md      ← Step-by-step setup (90 min)
+     Phase 1: Repository setup
+     Phase 2: GitHub secrets  
+     Phase 3: GCP setup (if Cloud Run/GKE)
+     Phase 4: Cloud Run setup (if Cloud Run)
+     Phase 5: GKE setup (if GKE)
+     Phase 6: Test workflows
+     Phase 7: Branch protection
+     Phase 8: Handoff
+
+ ➌  .github/IMPLEMENTATION_SUMMARY.md  ← What was created & why
+
+ ➍  .github/GITHUB_ACTIONS_SETUP.md    ← Detailed GCP CLI commands
+
+ ➎  .github/DEPLOYMENT_PLAYBOOK.md     ← Decision trees & incident response
+
+ ➏  .github/CI-CD-CHEATSHEET.md        ← Quick commands & troubleshooting
+
+────────────────────────────────────────────────────────────────────────────
+
+🚀 QUICK START (5 STEPS)
+────────────────────────────────────────────────────────────────────────────
+
+Step 1: Commit & push
+$ git add .github/ conftest.py .gitignore
+$ git commit -m "ci: add GitHub Actions"
+$ git push origin main
+
+Step 2: Open SETUP_CHECKLIST.md
+$ cat .github/SETUP_CHECKLIST.md
+
+Step 3: Complete phases 1-2 (add GitHub secrets)
+→ Settings → Secrets and variables → Actions
+
+Step 4: (Optional) Complete phases 3-5 (if using Cloud Run/GKE)
+→ Follow GCP CLI commands in SETUP_CHECKLIST.md
+
+Step 5: Test first workflow
+→ Go to Actions tab, verify lint-and-test passes
+
+────────────────────────────────────────────────────────────────────────────
+
+🔑 ESSENTIAL GITHUB SECRETS (Add immediately)
+────────────────────────────────────────────────────────────────────────────
+
+For Docker builds (required):
+  ✓ GITHUB_TOKEN  (auto-provided)
+
+For Cloud Run/GKE (if deploying):
+  ○ GCP_PROJECT_ID
+  ○ GCP_REGION
+  ○ GCP_ZONE
+  ○ GCP_WORKLOAD_IDENTITY_PROVIDER
+  ○ GCP_SERVICE_ACCOUNT
+  ○ REGISTRY_REPO
+  ○ SERVICE_NAME (Cloud Run)
+  ○ GKE_CLUSTER (GKE)
+  ○ CORS_ORIGIN
+  ○ DATABASE_URL
+  ○ EMAIL_ID, EMAIL_PASS, SMTP_SERVER, SMTP_PORT
+
+For Slack alerts (optional):
+  ✓ SLACK_WEBHOOK
+
+────────────────────────────────────────────────────────────────────────────
+
+🔄 TYPICAL WORKFLOWS
+────────────────────────────────────────────────────────────────────────────
+
+Regular Development:
+  git push origin develop
+    → lint-and-test.yml runs
+    → security-scan.yml runs
+    → Create PR to main when ready
+
+Merge to Main:
+  Merge PR to main
+    → All tests run
+    → Docker image built
+    → (Optional: Auto-deploy if configured)
+
+Release:
+  git tag v1.0.0
+  git push --tags
+    → build-docker.yml
+    → release.yml creates GitHub Release
+    → Images available in GHCR + GCP
+
+────────────────────────────────────────────────────────────────────────────
+
+❓ COMMON ISSUES & SOLUTIONS
+────────────────────────────────────────────────────────────────────────────
+
+Q: Workflow not triggering?
+A: Check YAML syntax with: yamllint .github/workflows/
+
+Q: Docker push fails?
+A: Verify service account has artifactregistry.writer role
+
+Q: Cloud Run deployment times out?
+A: Check DATABASE_URL is accessible from Cloud Run
+
+Q: How do I rollback?
+A: Cloud Run: gcloud run deploy --image PREVIOUS_IMAGE
+   GKE: kubectl rollout undo deployment/amazon-price-tracker
+
+See CI-CD-CHEATSHEET.md for more troubleshooting.
+
+────────────────────────────────────────────────────────────────────────────
+
+📊 STATUS DASHBOARD
+────────────────────────────────────────────────────────────────────────────
+
+Immediate Next Action:
+  [ ] Push changes to GitHub
+  [ ] Go to Actions tab
+  [ ] Watch lint-and-test pass
+
+Within 1 hour:
+  [ ] Add GitHub secrets (Phase 2 of SETUP_CHECKLIST.md)
+  [ ] Test first build (SETUP_CHECKLIST.md Phase 6)
+
+Within 24 hours:
+  [ ] Complete GCP setup (Phase 3 of SETUP_CHECKLIST.md)
+  [ ] Deploy to Cloud Run or GKE (Phase 4-5)
+  [ ] Enable branch protection (Phase 7)
+
+Within 1 week:
+  [ ] Verify security scans
+  [ ] Check Dependabot PR updates
+  [ ] Confirm Slack notifications work
+
+────────────────────────────────────────────────────────────────────────────
+
+📞 SUPPORT
+────────────────────────────────────────────────────────────────────────────
+
+Need help?
+  1. Check SETUP_CHECKLIST.md (phases list all steps)
+  2. Look in CI-CD-CHEATSHEET.md (quick answers)
+  3. Read DEPLOYMENT_PLAYBOOK.md (decision trees)
+  4. Review inline comments in workflow files
+
+────────────────────────────────────────────────────────────────────────────
+
+✅ YOUR SETUP IS READY!
+
+Next: Open .github/SETUP_CHECKLIST.md and follow the phases.
+
