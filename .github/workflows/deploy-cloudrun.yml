@@ -1,0 +1,145 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  REGION: ${{ secrets.GCP_REGION }}
+  SERVICE_NAME: ${{ secrets.SERVICE_NAME }}
+  REGISTRY_REPO: ${{ secrets.REGISTRY_REPO }}
+  IMAGE: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.REGISTRY_REPO }}/amazon-price-tracker
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker authentication
+        run: |
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build Docker image
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+          docker build \
+            -t ${{ env.IMAGE }}:$SHORT_SHA \
+            -t ${{ env.IMAGE }}:$BRANCH_NAME \
+            -t ${{ env.IMAGE }}:latest \
+            .
+
+      - name: Push image to Artifact Registry
+        run: |
+          docker push ${{ env.IMAGE }}:$(git rev-parse --short HEAD)
+          docker push ${{ env.IMAGE }}:$(git rev-parse --abbrev-ref HEAD)
+          docker push ${{ env.IMAGE }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image=${{ env.IMAGE }}:latest \
+            --platform=managed \
+            --region=${{ env.REGION }} \
+            --allow-unauthenticated \
+            --port=5000 \
+            --memory=512Mi \
+            --cpu=1 \
+            --timeout=300 \
+            --max-instances=10 \
+            --set-env-vars=\
+          FLASK_ENV=production,\
+          CORS_ORIGIN=${{ secrets.CORS_ORIGIN }},\
+          DATABASE_URL=${{ secrets.DATABASE_URL }},\
+          EMAIL_ID=${{ secrets.EMAIL_ID }},\
+          EMAIL_PASS=${{ secrets.EMAIL_PASS }},\
+          SMTP_SERVER=${{ secrets.SMTP_SERVER }},\
+          SMTP_PORT=${{ secrets.SMTP_PORT }}
+
+      - name: Get Cloud Run URL
+        id: cloud-run
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --format='value(status.url)')
+          echo "service_url=$SERVICE_URL" >> $GITHUB_OUTPUT
+
+      - name: Health check
+        run: |
+          for i in {1..30}; do
+            if curl -f ${{ steps.cloud-run.outputs.service_url }}/api/health; then
+              echo "✓ Service is healthy"
+              exit 0
+            fi
+            echo "Attempt $i/30 - waiting for service..."
+            sleep 10
+          done
+          echo "✗ Service health check failed"
+          exit 1
+
+      - name: Slack notification (success)
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "✅ PriceSnap deployed successfully",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Deployment Successful* 🚀\nService: ${{ env.SERVICE_NAME }}\nRegion: ${{ env.REGION }}\nURL: ${{ steps.cloud-run.outputs.service_url }}"
+                  }
+                }
+              ]
+            }
+
+      - name: Slack notification (failure)
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+          payload: |
+            {
+              "text": "❌ PriceSnap deployment failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Deployment Failed* ❌\nService: ${{ env.SERVICE_NAME }}\nCheck logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  }
+                }
+              ]
+            }
