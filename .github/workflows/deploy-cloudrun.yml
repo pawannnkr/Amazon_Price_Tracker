@@ -47,18 +47,10 @@ jobs:
       # ===============================
       # 🔎 DEBUG STEP (CRITICAL)
       # ===============================
-      - name: Debug Workload Identity
+      - name: Verify authentication
         run: |
-          echo "=== gcloud config ==="
-          gcloud config list
-          echo
-          echo "=== gcloud auth list ==="
-          gcloud auth list
-          echo
-          echo "=== STS token test ==="
-          gcloud sts token \
-            --audience="${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" \
-            --format="json"
+          echo "Printing access token (this confirms auth works)"
+          gcloud auth print-access-token
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
