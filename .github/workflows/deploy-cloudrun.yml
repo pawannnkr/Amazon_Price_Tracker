@@ -106,40 +106,40 @@ jobs:
           echo "✗ Service health check failed"
           exit 1
 
-      - name: Slack notification (success)
-        if: success()
-        uses: slackapi/slack-github-action@v1
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
-          payload: |
-            {
-              "text": "✅ PriceSnap deployed successfully",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Deployment Successful* 🚀\nService: ${{ env.SERVICE_NAME }}\nRegion: ${{ env.REGION }}\nURL: ${{ steps.cloud-run.outputs.service_url }}"
-                  }
-                }
-              ]
-            }
+      # - name: Slack notification (success)
+      #   if: success()
+      #   uses: slackapi/slack-github-action@v1
+      #   with:
+      #     webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+      #     payload: |
+      #       {
+      #         "text": "✅ PriceSnap deployed successfully",
+      #         "blocks": [
+      #           {
+      #             "type": "section",
+      #             "text": {
+      #               "type": "mrkdwn",
+      #               "text": "*Deployment Successful* 🚀\nService: ${{ env.SERVICE_NAME }}\nRegion: ${{ env.REGION }}\nURL: ${{ steps.cloud-run.outputs.service_url }}"
+      #             }
+      #           }
+      #         ]
+      #       }
 
-      - name: Slack notification (failure)
-        if: failure()
-        uses: slackapi/slack-github-action@v1
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
-          payload: |
-            {
-              "text": "❌ PriceSnap deployment failed",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Deployment Failed* ❌\nService: ${{ env.SERVICE_NAME }}\nCheck logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  }
-                }
-              ]
-            }
+      # - name: Slack notification (failure)
+      #   if: failure()
+      #   uses: slackapi/slack-github-action@v1
+      #   with:
+      #     webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+      #     payload: |
+      #       {
+      #         "text": "❌ PriceSnap deployment failed",
+      #         "blocks": [
+      #           {
+      #             "type": "section",
+      #             "text": {
+      #               "type": "mrkdwn",
+      #               "text": "*Deployment Failed* ❌\nService: ${{ env.SERVICE_NAME }}\nCheck logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      #             }
+      #           }
+      #         ]
+      #       }
