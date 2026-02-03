@@ -29,17 +29,36 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write
+      id-token: write   # REQUIRED for Workload Identity
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ===============================
+      # AUTHENTICATION (WIF)
+      # ===============================
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      # ===============================
+      # 🔎 DEBUG STEP (CRITICAL)
+      # ===============================
+      - name: Debug Workload Identity
+        run: |
+          echo "=== gcloud config ==="
+          gcloud config list
+          echo
+          echo "=== gcloud auth list ==="
+          gcloud auth list
+          echo
+          echo "=== STS token test ==="
+          gcloud sts token \
+            --audience="${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}" \
+            --format="json"
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -105,41 +124,3 @@ jobs:
           done
           echo "✗ Service health check failed"
           exit 1
-
-      # - name: Slack notification (success)
-      #   if: success()
-      #   uses: slackapi/slack-github-action@v1
-      #   with:
-      #     webhook-url: ${{ secrets.SLACK_WEBHOOK }}
-      #     payload: |
-      #       {
-      #         "text": "✅ PriceSnap deployed successfully",
-      #         "blocks": [
-      #           {
-      #             "type": "section",
-      #             "text": {
-      #               "type": "mrkdwn",
-      #               "text": "*Deployment Successful* 🚀\nService: ${{ env.SERVICE_NAME }}\nRegion: ${{ env.REGION }}\nURL: ${{ steps.cloud-run.outputs.service_url }}"
-      #             }
-      #           }
-      #         ]
-      #       }
-
-      # - name: Slack notification (failure)
-      #   if: failure()
-      #   uses: slackapi/slack-github-action@v1
-      #   with:
-      #     webhook-url: ${{ secrets.SLACK_WEBHOOK }}
-      #     payload: |
-      #       {
-      #         "text": "❌ PriceSnap deployment failed",
-      #         "blocks": [
-      #           {
-      #             "type": "section",
-      #             "text": {
-      #               "type": "mrkdwn",
-      #               "text": "*Deployment Failed* ❌\nService: ${{ env.SERVICE_NAME }}\nCheck logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-      #             }
-      #           }
-      #         ]
-      #       }
