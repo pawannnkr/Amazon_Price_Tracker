@@ -81,7 +81,7 @@ jobs:
             --image=${{ env.IMAGE }}:latest \
             --platform=managed \
             --region=${{ env.REGION }} \
-            --service-account=${{ secrets.GCP_SERVICE_ACCOUNT }}
+            --service-account=${{ secrets.GCP_SERVICE_ACCOUNT }}\
             --allow-unauthenticated \
             --port=5000 \
             --memory=512Mi \
