@@ -95,68 +95,68 @@ def send_mail(to_email, title, url):
         return False
 
 
-# def _send_whatsapp_cloud(phone_number, message):
-    """Send WhatsApp message using the WhatsApp Cloud API if configured."""
-    if not WHATSAPP_TOKEN or not WHATSAPP_PHONE_NUMBER_ID:
-        return None  # Not configured
-    try:
-        api_url = f"https://graph.facebook.com/v17.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
-        headers = {
-            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": phone_number,
-            "type": "text",
-            "text": {"body": message, "preview_url": True},
-        }
-        resp = requests.post(api_url, headers=headers, json=payload, timeout=15)
-        if 200 <= resp.status_code < 300:
-            print("📱 WhatsApp (Cloud API) message sent")
-            return True
-        else:
-            print(f"❌ WhatsApp Cloud API error: {resp.status_code} {resp.text}")
-            return False
-    except Exception as e:
-        print("❌ WhatsApp Cloud API exception:", e)
-        return False
+# # def _send_whatsapp_cloud(phone_number, message):
+#     """Send WhatsApp message using the WhatsApp Cloud API if configured."""
+#     if not WHATSAPP_TOKEN or not WHATSAPP_PHONE_NUMBER_ID:
+#         return None  # Not configured
+#     try:
+#         api_url = f"https://graph.facebook.com/v17.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+#         headers = {
+#             "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+#             "Content-Type": "application/json",
+#         }
+#         payload = {
+#             "messaging_product": "whatsapp",
+#             "to": phone_number,
+#             "type": "text",
+#             "text": {"body": message, "preview_url": True},
+#         }
+#         resp = requests.post(api_url, headers=headers, json=payload, timeout=15)
+#         if 200 <= resp.status_code < 300:
+#             print("📱 WhatsApp (Cloud API) message sent")
+#             return True
+#         else:
+#             print(f"❌ WhatsApp Cloud API error: {resp.status_code} {resp.text}")
+#             return False
+#     except Exception as e:
+#         print("❌ WhatsApp Cloud API exception:", e)
+#         return False
 
 
-# def send_whatsapp(phone_number, title, url):
-    """
-    Send WhatsApp notification for price drop.
+# # def send_whatsapp(phone_number, title, url):
+#     """
+#     Send WhatsApp notification for price drop.
 
-    Tries WhatsApp Cloud API first if configured; otherwise falls back to pywhatkit
-    which requires a GUI/browser session logged into WhatsApp Web.
-    """
-    try:
-        msg = f"📢 Price drop alert! {title}\n{url}"
+#     Tries WhatsApp Cloud API first if configured; otherwise falls back to pywhatkit
+#     which requires a GUI/browser session logged into WhatsApp Web.
+#     """
+#     try:
+#         msg = f"📢 Price drop alert! {title}\n{url}"
 
-        # Try Cloud API first if configured
-        cloud_result = _send_whatsapp_cloud(phone_number, msg)
-        if cloud_result is True:
-            return True
-        if cloud_result is False:
-            return False
+#         # Try Cloud API first if configured
+#         cloud_result = _send_whatsapp_cloud(phone_number, msg)
+#         if cloud_result is True:
+#             return True
+#         if cloud_result is False:
+#             return False
 
-        # Fallback to pywhatkit
-        pywhatkit = _get_pywhatkit()
-        if pywhatkit is False or not _has_display():
-            print("❌ WhatsApp not available (requires GUI browser or configure WHATSAPP_TOKEN + WHATSAPP_PHONE_NUMBER_ID)")
-            return False
+#         # Fallback to pywhatkit
+#         pywhatkit = _get_pywhatkit()
+#         if pywhatkit is False or not _has_display():
+#             print("❌ WhatsApp not available (requires GUI browser or configure WHATSAPP_TOKEN + WHATSAPP_PHONE_NUMBER_ID)")
+#             return False
 
-        now = datetime.datetime.now()
-        # Schedule 2 minutes in the future to allow WhatsApp Web to open
-        minute = now.minute + 2
-        hour = now.hour
-        if minute >= 60:
-            minute -= 60
-            hour = (hour + 1) % 24
+#         now = datetime.datetime.now()
+#         # Schedule 2 minutes in the future to allow WhatsApp Web to open
+#         minute = now.minute + 2
+#         hour = now.hour
+#         if minute >= 60:
+#             minute -= 60
+#             hour = (hour + 1) % 24
 
-        pywhatkit.sendwhatmsg(phone_number, msg, hour, minute)
-        print(f"📱 WhatsApp scheduled for {title}")
-        return True
-    except Exception as e:
-        print("❌ WhatsApp error:", e)
-        return False
+#         pywhatkit.sendwhatmsg(phone_number, msg, hour, minute)
+#         print(f"📱 WhatsApp scheduled for {title}")
+#         return True
+#     except Exception as e:
+#         print("❌ WhatsApp error:", e)
+#         return False
