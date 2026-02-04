@@ -116,6 +116,24 @@ def health():
     return jsonify({"status": "healthy", "message": "Amazon Price Tracker API is running"})
 
 
+@app.route('/', methods=['GET'])
+def index():
+    """Root endpoint - returns API info"""
+    return jsonify({
+        "message": "Amazon Price Tracker API",
+        "version": "1.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/api/health",
+            "users": "/api/users",
+            "products": "/api/products",
+            "notifications": "/api/notifications",
+            "history": "/api/history",
+            "track": "/api/track/check"
+        }
+    })
+
+
 # Users API
 @app.route('/api/users', methods=['POST'])
 def create_user():

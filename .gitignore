@@ -63,3 +63,4 @@ htmlcov/
 .coverage.*
 *,cover
 Thumbs.db
+.env.test
