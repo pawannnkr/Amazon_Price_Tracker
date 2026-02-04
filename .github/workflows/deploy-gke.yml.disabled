@@ -131,26 +131,26 @@ jobs:
             echo "Service IP not yet assigned, skipping health check"
           fi
 
-      - name: Slack notification (success)
-        if: success()
-        uses: slackapi/slack-github-action@v1
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK }}
-          payload: |
-            {
-              "text": "✅ PriceSnap deployed to GKE successfully",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*GKE Deployment Successful* 🚀\nCluster: ${{ env.GKE_CLUSTER }}\nNamespace: ${{ env.NAMESPACE }}\nImage: ${{ env.IMAGE_TAG }}"
-                  }
-                }
-              ]
-            }
+      # - name: Slack notification (success)
+      #   if: success()
+      #   uses: slackapi/slack-github-action@v1
+      #   with:
+      #     webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+      #     payload: |
+      #       {
+      #         "text": "✅ PriceSnap deployed to GKE successfully",
+      #         "blocks": [
+      #           {
+      #             "type": "section",
+      #             "text": {
+      #               "type": "mrkdwn",
+      #               "text": "*GKE Deployment Successful* 🚀\nCluster: ${{ env.GKE_CLUSTER }}\nNamespace: ${{ env.NAMESPACE }}\nImage: ${{ env.IMAGE_TAG }}"
+      #             }
+      #           }
+      #         ]
+      #       }
 
-      - name: Slack notification (failure)
+      # - name: Slack notification (failure)
         if: failure()
         uses: slackapi/slack-github-action@v1
         with:
