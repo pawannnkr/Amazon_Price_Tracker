@@ -159,10 +159,10 @@ class TestPriceHistoryModel:
         
         # Create multiple entries
         timestamps = [
+            datetime.utcnow() - timedelta(days=4),
             datetime.utcnow() - timedelta(days=3),
             datetime.utcnow() - timedelta(days=2),
-            datetime.utcnow() - timedelta(days=1),
-            datetime.utcnow()
+            datetime.utcnow() - timedelta(days=1)
         ]
         
         for i, ts in enumerate(timestamps):

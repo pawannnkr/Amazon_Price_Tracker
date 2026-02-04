@@ -1,17 +1,45 @@
 """
 Pytest configuration and fixtures for PriceSnap tests.
 Uses PostgreSQL test database with transaction rollback for test isolation.
+
+Database credentials can be set via environment variables or .env.test file:
+- TEST_DB_USER: PostgreSQL username (default: testuser)
+- TEST_DB_PASS: PostgreSQL password (default: testpass)
+- TEST_DB_NAME: PostgreSQL database name (default: pricesnapdb)
+- TEST_DATABASE_URL: Full database URL (overrides individual settings)
+
+For CI/CD, set these as GitHub Secrets to avoid exposing credentials.
 """
 import os
 import sys
 import pytest
 from dotenv import load_dotenv
 
-# Load test environment variables
+# Load test environment variables from .env.test if exists
 load_dotenv(dotenv_path='.env.test')
 
 # Add parent directory for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+# ============================================================================
+# Database Configuration
+# ============================================================================
+
+def get_test_database_url():
+    """Get test database URL from environment or construct from individual settings."""
+    # Check for full URL first
+    if os.getenv("TEST_DATABASE_URL"):
+        return os.getenv("TEST_DATABASE_URL")
+    
+    # Otherwise construct from individual settings
+    db_user = os.getenv("TEST_DB_USER", "testuser")
+    db_pass = os.getenv("TEST_DB_PASS", "testpass")
+    db_name = os.getenv("TEST_DB_NAME", "pricesnapdb")
+    db_host = os.getenv("TEST_DB_HOST", "localhost")
+    db_port = os.getenv("TEST_DB_PORT", "5432")
+    
+    return f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
 
 
 # ============================================================================
@@ -21,10 +49,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 @pytest.fixture(scope="session")
 def test_database_url():
     """Get test database URL from environment."""
-    return os.getenv(
-        "TEST_DATABASE_URL",
-        "postgresql://price_tracker_user:pass@123@localhost:5432/price_tracker_test"
-    )
+    return get_test_database_url()
 
 
 @pytest.fixture(scope="session")
@@ -47,7 +72,8 @@ def test_engine(test_database_url):
         from sqlalchemy import text
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        print(f"✅ Test database connected: {test_database_url.split('@')[0]}@****")
+        db_name = test_database_url.split('/')[-1]
+        print(f"✅ Test database connected: {db_name}")
     except Exception as e:
         print(f"⚠️  Test database connection warning: {e}")
     
@@ -59,18 +85,32 @@ def test_engine(test_database_url):
 
 @pytest.fixture(scope="session", autouse=True)
 def _setup_test_db_tables(test_engine):
-    """Create all tables once per test session, drop after all tests complete."""
+    """
+    Verify database tables exist (tables should be created once via setup_test_database.py).
+    This fixture just verifies connection and table existence without creating/dropping.
+    """
     from database.models import Base
+    from sqlalchemy import inspect
     
-    # Create tables
-    Base.metadata.create_all(bind=test_engine)
-    print("📦 Test database tables created")
+    # Verify tables exist
+    inspector = inspect(test_engine)
+    existing_tables = inspector.get_table_names()
+    
+    # Check if our required tables exist
+    required_tables = ['users', 'products', 'price_history', 'notification_settings']
+    missing_tables = [t for t in required_tables if t not in existing_tables]
+    
+    if missing_tables:
+        print(f"📦 Creating missing tables: {', '.join(missing_tables)}")
+        Base.metadata.create_all(bind=test_engine)
+        print("✅ Tables created successfully!")
+    else:
+        print("✅ All test database tables already exist")
     
     yield
     
-    # Drop tables after all tests (optional cleanup)
-    # Base.metadata.drop_all(bind=test_engine)
-    # print("📦 Test database tables dropped")
+    # Tables are NOT dropped - they persist for subsequent test runs
+    print("✅ Test session complete - tables preserved for next run")
 
 
 @pytest.fixture
@@ -120,10 +160,7 @@ def flask_app():
     app.config["DEBUG"] = False
     
     # Use test database URL
-    app.config["TEST_DATABASE_URL"] = os.getenv(
-        "TEST_DATABASE_URL",
-        "postgresql://price_tracker_user:pass@123@localhost:5432/price_tracker_test"
-    )
+    app.config["TEST_DATABASE_URL"] = get_test_database_url()
     
     yield app
 

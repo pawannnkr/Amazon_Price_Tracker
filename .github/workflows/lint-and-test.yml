@@ -2,9 +2,14 @@ name: Lint and Test
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main]
+
+# Secrets required for test database (add these in GitHub repo Settings -> Secrets)
+# - TEST_DB_USER: PostgreSQL username for test database
+# - TEST_DB_PASS: PostgreSQL password for test database
+# - TEST_DB_NAME: PostgreSQL database name (default: pricesnapdb)
 
 jobs:
   lint-and-test:
@@ -17,9 +22,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_USER: testuser
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: pricesnapdb
+          POSTGRES_USER: ${{ secrets.TEST_DB_USER || 'testuser' }}
+          POSTGRES_PASSWORD: ${{ secrets.TEST_DB_PASS || 'testpass' }}
+          POSTGRES_DB: ${{ secrets.TEST_DB_NAME || 'pricesnapdb' }}
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -41,7 +46,27 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install flake8 pytest pytest-cov black isort
+        pip install flake8 pytest pytest-cov black isort psycopg2-binary
+
+    - name: Create test database and user
+      env:
+        POSTGRES_USER: postgres
+        TEST_DB_USER: ${{ secrets.TEST_DB_USER || 'testuser' }}
+        TEST_DB_PASS: ${{ secrets.TEST_DB_PASS || 'testpass' }}
+        TEST_DB_NAME: ${{ secrets.TEST_DB_NAME || 'pricesnapdb' }}
+      run: |
+        sudo -u postgres psql -c "CREATE USER $TEST_DB_USER WITH PASSWORD '$TEST_DB_PASS';" 2>/dev/null || true
+        sudo -u postgres psql -c "CREATE DATABASE $TEST_DB_NAME OWNER $TEST_DB_USER;" 2>/dev/null || true
+        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $TEST_DB_NAME TO $TEST_DB_USER;" 2>/dev/null || true
+        sudo -u postgres psql -c "ALTER USER $TEST_DB_USER CREATEDB;" 2>/dev/null || true
+        sudo -u postgres psql -c "GRANT ALL ON SCHEMA public TO $TEST_DB_USER;" -d $TEST_DB_NAME 2>/dev/null || true
+
+    - name: Initialize test database tables
+      env:
+        DATABASE_URL: postgresql://${{ secrets.TEST_DB_USER || 'testuser' }}:${{ secrets.TEST_DB_PASS || 'testpass' }}@localhost:5432/${{ secrets.TEST_DB_NAME || 'pricesnapdb' }}
+      run: |
+        python init_db.py
+        python -c "from database.models import Base; from database.db import engine; Base.metadata.create_all(bind=engine); print('Tables created successfully')"
 
     - name: Lint with flake8
       run: |
@@ -58,12 +83,12 @@ jobs:
 
     - name: Test database connection
       env:
-        DATABASE_URL: postgresql://testuser:testpass@localhost:5432/pricesnapdb
+        DATABASE_URL: postgresql://${{ secrets.TEST_DB_USER || 'testuser' }}:${{ secrets.TEST_DB_PASS || 'testpass' }}@localhost:5432/${{ secrets.TEST_DB_NAME || 'pricesnapdb' }}
       run: python database/test_connection.py
 
     - name: Run unit tests
       env:
-        DATABASE_URL: postgresql://testuser:testpass@localhost:5432/pricesnapdb
+        DATABASE_URL: postgresql://${{ secrets.TEST_DB_USER || 'testuser' }}:${{ secrets.TEST_DB_PASS || 'testpass' }}@localhost:5432/${{ secrets.TEST_DB_NAME || 'pricesnapdb' }}
         FLASK_ENV: testing
       run: |
         pytest --cov=. --cov-report=xml --cov-report=term || true
@@ -74,3 +99,4 @@ jobs:
         files: ./coverage.xml
         fail_ci_if_error: false
         verbose: true
+
