@@ -33,7 +33,7 @@ zipp==3.23.0
 pyinstaller==6.3.0
 marshmallow==3.21.3
 sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.11
 
 # Testing dependencies
 pytest==8.3.5
